@@ -1,7 +1,8 @@
 module Main where
 
 import System.IO (readFile, writeFile)
-import Data.List (subsequences)
+import Data.List (subsequences, sort, takeWhile)
+import Data.Maybe (catMaybes)
 
 type Triangle = (Integer, Integer, Integer)
 -- type Triangle = [Integer]
@@ -18,42 +19,52 @@ format xs = map (\(i,x) -> "Case #" ++ show i ++ ": " ++ show' x) $ zip [1..] xs
     where
         show' = maybe "IMPOSSIBLE" show 
 
-subsequences' :: Int -> [a] -> [[a]]
-subsequences' _ [] = []
-subsequences' i (x:xs)
-    | i == 1 = [[x]] ++ subsequences' i xs
-    | otherwise = listsWithX x xs ++ listsWithoutX xs
-    where
-        listsWithX x xs = map (\s -> (x:s)) . subsequences' (i-1) $ xs
-        listsWithoutX xs = subsequences' i xs
-
 sublists :: Int -> [a] -> [[a]]
 sublists  0 _ = [[]]
 sublists  _ [] = []
-sublists n (x:xs) = sublists n xs ++ map (x:) (sublists (n-1) xs)
+sublists n (x:xs) = map (x:) (sublists (n-1) xs) ++ sublists n xs
 
-getTriangles :: [Integer] -> [Triangle]
-getTriangles = filter validTriangle
-             . map (\(x:y:z:[]) -> (x,y,z))
-             . sublists 3
+getTriangles :: [Integer] -> [Maybe Triangle]
+getTriangles [] = []
+getTriangles (x:xs) = (smallestTriangleWithX x xs) : getTriangles xs
+
+smallestTriangleWithX :: Integer -> [Integer] -> Maybe Triangle
+smallestTriangleWithX a xs = head'
+                           . filter validTriangle
+                           . map (\(x:y:z:[]) -> (x,y,z))
+                           . map (a:) 
+                           . sublists 2 $ xs
 
 minTriangle :: [Triangle] -> Maybe Integer
 minTriangle [] = Nothing
 minTriangle xs = Just $ (minimum . map (\(a,b,c) -> a+b+c)) xs
 
--- TODO CHANGE
+head' :: [Triangle] -> Maybe Triangle
+head' [] = Nothing
+head' (x:_) = Just x
+
+minimum' :: [Triangle] -> Maybe Triangle
+minimum' [] = Nothing
+minimum' xs = Just (minimum xs)
+
+doWork :: [Integer] -> Maybe Integer
+doWork = minTriangle
+       . catMaybes
+       . getTriangles
+       . sort
+
 processInput :: [String] -> [[Integer]]
 processInput [] = []
-processInput (x:xs) = ((map read . take 150 . tail . words) x) : processInput xs
+processInput (x:xs) = ((map read . tail . words) x) : processInput xs
 
 challenge :: [String] -> String
-challenge = unlines . format . map (minTriangle . getTriangles) . processInput
+challenge = unlines . format . map doWork . processInput
 
 main = do
     contents <- readFile "submit_input4.txt"
     -- contents <- readFile "test_input4.txt"
     let l = tail . lines $ contents
-        
-    print . challenge $ l
+
+    -- print . challenge $ l
     -- writeFile "test_output4.txt" . challenge $ l
-    -- writeFile "submit_output4.txt" . challenge $ l
+    writeFile "submit_output4.txt" . challenge $ l
